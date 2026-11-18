@@ -1,1 +1,10 @@
-
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BIG NFC PIX</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#071b21;color:#fff;font-family:system-ui,-apple-system,Arial,sans-serif}main{max-width:460px;margin:55px auto;padding:25px}section{background:#102c32;border:1px solid #2c555a;border-radius:22px;padding:28px;box-shadow:0 15px 40px #0004}h1{color:#5ce0aa;margin:0 0 10px;font-size:32px}p{line-height:1.55;color:#d0e1df}label{display:block;margin-top:25px;margin-bottom:8px;font-weight:600}input{width:100%;padding:16px;border-radius:12px;border:1px solid #658b8a;background:#fff;color:#152d31;font-size:22px}button{margin-top:18px;width:100%;padding:16px;border:0;border-radius:12px;background:#45c58b;color:#06221b;font-size:17px;font-weight:750}small{display:block;margin-top:18px;color:#b6ccca;line-height:1.5}.hint{padding:12px;border-radius:10px;background:#1c4146;margin-top:18px}</style>
+</head>
+<body><main><section><h1>BIG NFC PIX</h1><p>Pagamento Pix por aproximação</p><label for="valor">Valor do pagamento (R$)</label><input id="valor" inputmode="decimal" placeholder="Ex.: 25,00" aria-describedby="aviso"><button type="button" onclick="aviso()">Continuar</button><div class="hint" id="aviso" role="status">Estamos preparando o sistema de pagamentos.</div><small>Versão inicial de demonstração. Nenhuma cobrança é gerada nesta página. Não informe dados bancários aqui.</small></section></main><script>function aviso(){document.getElementById('aviso').textContent='Demonstração: o Pix ainda não está configurado. Nenhum pagamento foi gerado.'}</script></body>
+</html>
