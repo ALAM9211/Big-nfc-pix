@@ -1,0 +1,277 @@
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>BIG NFC PIX | Vendedores</title>
+  <style>
+    *{box-sizing:border-box}
+    body{margin:0;background:#f1f5f3;font-family:Arial,sans-serif;color:#17352b}
+    header{background:#087d51;color:white;padding:24px;text-align:center}
+    header h1{margin:0}
+    main{max-width:760px;margin:25px auto;padding:16px}
+    section{background:white;border-radius:15px;padding:22px;margin-bottom:18px;box-shadow:0 4px 18px #0001}
+    input,select,button{width:100%;padding:13px;margin:7px 0;border-radius:9px;font-size:16px}
+    input,select{border:1px solid #ccc}
+    button{background:#087d51;color:white;border:0;font-weight:bold;cursor:pointer}
+    button.secondary{background:#52645c}
+    button:disabled{opacity:.5}
+    .error{color:#b42318}
+    .muted{color:#60766a}
+    .item{border-top:1px solid #ddd;padding:15px 0;overflow-wrap:anywhere}
+    a{color:#087d51}
+    [hidden]{display:none!important}
+    .plans{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+    .plans button{margin:0;font-size:14px;padding:13px 8px}
+    .plans button:disabled{opacity:.55}
+    @media(max-width:450px){.plans{grid-template-columns:1fr}}
+  </style>
+</head>
+<body>
+<header>
+  <h1>BIG NFC PIX</h1>
+  <p>Painel dos vendedores</p>
+</header>
+
+<main>
+  <section id="login">
+    <h2>Entrar</h2>
+    <input id="email" type="email" placeholder="Seu e-mail">
+    <input id="senha" type="password" placeholder="Sua senha">
+    <button id="entrar">Entrar</button>
+    <p id="msgLogin" class="error"></p>
+  </section>
+
+  <div id="painel" hidden>
+    <section>
+      <h2>Minha conta</h2>
+      <p id="usuario"></p>
+      <p id="plano"></p>
+      <p id="limite"></p>
+      <button class="secondary" id="sair">Sair</button>
+    </section>
+
+    <section>
+      <h2>Minha assinatura</h2>
+      <p class="muted">Escolha um plano para abrir o checkout de teste do Mercado Pago.</p>
+      <div class="plans" id="opcoesPlano">
+        <button type="button" data-plano="premium_mensal">Premium mensal — R$ 25,99</button>
+        <button type="button" data-plano="premium_anual">Premium anual — R$ 218,30</button>
+        <button type="button" data-plano="profissional_mensal">Profissional mensal — R$ 47,99</button>
+        <button type="button" data-plano="profissional_anual">Profissional anual — R$ 403,00</button>
+      </div>
+      <p id="msgPagamento" role="status" class="muted"></p>
+      <small class="muted">Pagamento de teste. A contratação só deverá ativar o plano após confirmação segura pelo servidor.</small>
+    </section>
+
+    <section>
+      <h2>Cadastrar cliente Pix</h2>
+      <form id="form">
+        <input id="nome" placeholder="Nome da loja" required>
+        <input id="slug" placeholder="Identificador do link (ex.: minha-loja)" required pattern="[a-z0-9-]+">
+        <select id="tipo">
+          <option value="CPF">CPF</option>
+          <option value="CNPJ">CNPJ</option>
+          <option value="EMAIL">E-mail</option>
+          <option value="PHONE">Telefone</option>
+          <option value="EVP">Chave aleatória</option>
+        </select>
+        <input id="pix" placeholder="Chave Pix" required>
+        <input id="cidade" placeholder="Cidade">
+        <button id="salvar" type="submit">Cadastrar placa Pix</button>
+      </form>
+      <p id="msgCadastro"></p>
+    </section>
+
+    <section>
+      <h2>Meus links Pix</h2>
+      <div id="lista"></div>
+    </section>
+  </div>
+</main>
+
+<script type="module">
+import {createClient} from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+const supabase=createClient(
+  "https://mgpbcdqaxfdqgjsirwkc.supabase.co",
+  "sb_publishable_Xg1UVGsOQpqvXFd5J_ZDlA_Tw0qwxtG"
+);
+
+const $=id=>document.getElementById(id);
+let usuarioAtual=null;
+
+function mensagem(id,texto,erro=false){
+  $(id).textContent=texto;
+  $(id).className=erro?"error":"muted";
+}
+
+$("entrar").onclick=async()=>{
+  mensagem("msgLogin","Entrando...");
+  const {error}=await supabase.auth.signInWithPassword({
+    email:$("email").value.trim(),
+    password:$("senha").value
+  });
+  if(error){
+    mensagem("msgLogin","Não foi possível entrar. Confira e-mail e senha.",true);
+    return;
+  }
+  await carregar();
+};
+
+$("sair").onclick=async()=>{
+  await supabase.auth.signOut();
+  usuarioAtual=null;
+  $("painel").hidden=true;
+  $("login").hidden=false;
+};
+
+async function carregar(){
+  const {data:{user},error}=await supabase.auth.getUser();
+  if(error||!user){
+    $("login").hidden=false;
+    $("painel").hidden=true;
+    return;
+  }
+  usuarioAtual=user;
+  $("login").hidden=true;
+  $("painel").hidden=false;
+  $("usuario").textContent=user.email;
+
+  const {data:assinatura,error:erroPlano}=await supabase
+    .from("assinaturas")
+    .select("plano_id,status")
+    .eq("usuario_id",user.id)
+    .maybeSingle();
+
+  if(erroPlano||!assinatura){
+    $("plano").textContent="Assinatura não encontrada.";
+    $("salvar").disabled=true;
+  }else{
+    $("plano").textContent="Plano: "+assinatura.plano_id+
+      " | Situação: "+assinatura.status;
+    $("salvar").disabled=assinatura.status!=="ativa";
+  }
+
+  const {data:historico,error:erroHistorico}=await supabase
+    .from("historico_links")
+    .select("id")
+    .eq("usuario_id",user.id);
+
+  $("limite").textContent=erroHistorico
+    ?"Não foi possível consultar o consumo."
+    :"Links registrados: "+historico.length;
+
+  await listar();
+}
+
+async function listar(){
+  const lista=$("lista");
+  lista.replaceChildren();
+  const {data,error}=await supabase
+    .from("empresas")
+    .select("id,nome,slug,cidade")
+    .eq("usuario_id",usuarioAtual.id)
+    .order("nome");
+
+  if(error){
+    lista.textContent="Erro ao consultar links.";
+    return;
+  }
+  if(!data.length){
+    lista.textContent="Nenhuma placa cadastrada.";
+    return;
+  }
+
+  for(const empresa of data){
+    const div=document.createElement("div");
+    div.className="item";
+    const titulo=document.createElement("strong");
+    titulo.textContent=empresa.nome;
+    const p=document.createElement("p");
+    p.textContent=empresa.cidade||"";
+    const link=document.createElement("a");
+    link.href="pix.html?loja="+encodeURIComponent(empresa.slug);
+    link.target="_blank";
+    link.rel="noopener";
+    link.textContent="Abrir página Pix";
+    div.append(titulo,p,link);
+    lista.append(div);
+  }
+}
+
+$("form").onsubmit=async evento=>{
+  evento.preventDefault();
+  if(!usuarioAtual)return;
+  $("salvar").disabled=true;
+  mensagem("msgCadastro","Salvando...");
+
+  const registro={
+    usuario_id:usuarioAtual.id,
+    nome:$("nome").value.trim(),
+    slug:$("slug").value.trim().toLowerCase(),
+    chave_pix:$("pix").value.trim(),
+    cidade:$("cidade").value.trim()||null,
+    ativo:true
+  };
+
+  const {error}=await supabase.from("empresas").insert(registro);
+
+  if(error){
+    mensagem("msgCadastro",
+      "Cadastro não realizado: "+error.message,true);
+  }else{
+    mensagem("msgCadastro","Cliente cadastrado com sucesso!");
+    $("form").reset();
+  }
+  await carregar();
+};
+
+// Usa a sessão existente; nunca exponha o access token do Mercado Pago aqui.
+$("opcoesPlano").addEventListener("click",async evento=>{
+  const botao=evento.target.closest("button[data-plano]");
+  if(!botao)return;
+  const plano=botao.dataset.plano;
+  const {data:{session},error:erroSessao}=await supabase.auth.getSession();
+  if(erroSessao||!session?.access_token){
+    mensagem("msgPagamento","Entre novamente na sua conta antes de contratar.",true);
+    return;
+  }
+  const botoes=[...$("opcoesPlano").querySelectorAll("button")];
+  botoes.forEach(b=>b.disabled=true);
+  mensagem("msgPagamento","Solicitando checkout de teste...");
+  try{
+    const resposta=await fetch(
+      "https://mgpbcdqaxfdqgjsirwkc.supabase.co/functions/v1/criar-pagamento",
+      {
+        method:"POST",
+        headers:{
+          "Content-Type":"application/json",
+          "Authorization":"Bearer "+session.access_token,
+          "apikey":"sb_publishable_Xg1UVGsOQpqvXFd5J_ZDlA_Tw0qwxtG"
+        },
+        body:JSON.stringify({plan:plano})
+      }
+    );
+    const resultado=await resposta.json().catch(()=>({}));
+    if(!resposta.ok){
+      throw new Error(resultado.error||resultado.message||("Erro HTTP "+resposta.status));
+    }
+    const url=resultado.sandbox_init_point||resultado.init_point||resultado.url||resultado.checkout_url;
+    if(typeof url!=="string"||!/^https:\/\/(www\.)?mercadopago\.com(\.br)?\//i.test(url)){
+      throw new Error("A função respondeu, mas não retornou um link válido do Mercado Pago. Confira o formato da resposta.");
+    }
+    mensagem("msgPagamento","Abrindo checkout de teste...");
+    window.location.assign(url);
+  }catch(erro){
+    mensagem("msgPagamento","Não foi possível iniciar o pagamento: "+erro.message,true);
+  }finally{
+    botoes.forEach(b=>b.disabled=false);
+  }
+});
+
+await carregar();
+</script>
+</body>
+</html>
